@@ -22,7 +22,7 @@ import           Test.Hspec.Core.Spec
 --------------------------------------------------------------------------------
 
 data GoldenTest actual golden =
-  GoldenTest { goldenTest :: Golden actual golden
+  GoldenTest { theTest    :: Golden actual golden
              , testOutput :: actual
              }
 
@@ -100,14 +100,19 @@ openTempFile dir name = do dir'    <- decodeFS dir
                            fp      <- encodeFS fp'
                            pure (fp,h)
 
-
-actualFilePath        :: Golden actual golden -> IO OsPath
-actualFilePath golden = case golden.actualFile of
-    TempFile mDir name -> do dir    <- maybe Directory.getTemporaryDirectory pure mDir
-                             (fp,h) <- openTempFile dir name
+-- | Creates a temporary file (and closes it).
+createTempFile          :: OsPath -> OsString -> IO OsPath
+createTempFile dir name = do (fp,h) <- openTempFile dir name
                              System.IO.hClose h
                              pure fp
-    PermanentFile fp      -> pure fp
+
+-- | Get the actual file path, making sure to create the directlry if it does not exist.
+actualFilePath        :: Golden actual golden -> IO OsPath
+actualFilePath golden = case golden.actualFile of
+    TempFile mDir name -> do dir <- maybe Directory.getTemporaryDirectory pure mDir
+                             createTempFile dir name
+    PermanentFile fp   -> do Directory.createDirectoryIfMissing True fp
+                             pure fp
 
 
 -- flip argument order;

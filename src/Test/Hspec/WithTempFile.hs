@@ -20,8 +20,13 @@ myTest = GoldenTest defaultGolden (fib 5)
 
 spec :: Spec
 spec = describe "example test" $ do
-         golden "simple Text test" $ myTest
+         golden "simple Text test" defaultGolden (fib 5)
+         goldenTest "simple Text test" $ myTest
 
 -- | Combinator to run a golden test with a temporary file
-golden         :: Eq golden => String -> GoldenTest actual golden -> Spec
-golden name gt = it name gt
+golden               :: Eq golden => String -> Golden actual golden -> actual -> Spec
+golden name golden a = goldenTest name $ GoldenTest golden a
+
+-- | Combinator to run a golden test with a temporary file
+goldenTest         :: Eq golden => String -> GoldenTest actual golden -> Spec
+goldenTest name gt = it name gt
