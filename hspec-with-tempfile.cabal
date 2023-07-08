@@ -40,13 +40,14 @@ common setup
       , LambdaCase
       , ViewPatterns
       , FunctionalDependencies
+      , OverloadedRecordDot
 
 library
     import:           setup
     exposed-modules:
         Test.Hspec.WithTempFile
-    -- other-modules:
-    -- other-extensions:
+    other-modules:
+        Test.Hspec.WithTempFile.Golden
     hs-source-dirs:   src
 
 
