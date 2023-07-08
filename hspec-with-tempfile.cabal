@@ -1,0 +1,64 @@
+cabal-version:      3.4
+name:               hspec-with-tempfile
+version:            0.1.0.0
+synopsis:           hspec support for using golden tests with temporary files
+-- description:
+license:            MIT
+license-file:       LICENSE
+author:             Frank Staals
+maintainer:         frank@fstaals.net
+-- copyright:
+category:           Testing
+build-type:         Simple
+extra-doc-files:    CHANGELOG.md
+-- extra-source-files:
+
+
+common setup
+    ghc-options: -Wall -O
+    default-language: GHC2021
+    build-depends:
+        base                    >= 4.16.1.0      &&  < 5
+      , hspec                   >= 2.9
+      , hspec-core              >= 2.9
+      , filepath                >= 1.4.100.3
+      , text                    >= 2.0
+
+    default-extensions:
+        DataKinds
+      , TypeFamilies
+      , GADTs
+      , KindSignatures
+      , ScopedTypeVariables
+      , DerivingStrategies
+      , DerivingVia
+      , GeneralizedNewtypeDeriving
+      , DeriveGeneric
+      , DeriveFunctor
+      , PatternSynonyms
+      , TupleSections
+      , LambdaCase
+      , ViewPatterns
+      , FunctionalDependencies
+
+library
+    import:           setup
+    exposed-modules:
+        Test.Hspec.WithTempFile
+    -- other-modules:
+    -- other-extensions:
+    hs-source-dirs:   src
+
+
+test-suite hspec-with-tempfile-test
+    import:           setup
+    build-tool-depends: hspec-discover:hspec-discover
+    other-modules:
+        Spec
+        ExampleSpec
+    -- other-extensions:
+    type:             exitcode-stdio-1.0
+    hs-source-dirs:   test
+    main-is:          Main.hs
+    build-depends:
+        hspec-with-tempfile
