@@ -9,6 +9,7 @@ module Test.Hspec.WithTempFile.Golden
   , ActualWriter(..)
   , ActualFile(..)
   , fromTestName
+  , ActualFilePolicy(..)
   , Diff(..)
 
   , writeActual

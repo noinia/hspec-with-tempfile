@@ -10,6 +10,8 @@ module Test.Hspec.WithTempFile
 
   , ActualWriter(..)
   , ActualFile(..)
+  , fromTestName
+  , ActualFilePolicy(..)
 
   , Diff(..)
 
