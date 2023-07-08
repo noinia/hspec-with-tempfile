@@ -16,7 +16,7 @@ fib n = fibs !! n
   where
     fibs = 0 : 1 : zipWith (+) fibs (tail fibs)
 
-myTest = GoldenTest defGolden (fib 5)
+myTest = GoldenTest defaultGolden (fib 5)
 
 spec :: Spec
 spec = describe "example test" $ do
