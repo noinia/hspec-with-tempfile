@@ -2,7 +2,8 @@ cabal-version:      3.4
 name:               hspec-with-tempfile
 version:            0.1.0.0
 synopsis:           hspec support for using golden tests with temporary files
--- description:
+description:
+    hspec support for conveniently using golden tests with temporary files
 license:            MIT
 license-file:       LICENSE
 author:             Frank Staals
@@ -12,10 +13,19 @@ category:           Testing
 build-type:         Simple
 extra-doc-files:    CHANGELOG.md
 -- extra-source-files:
+data-dir: data
+data-files: golden/*.golden
+tested-with:
+    GHC == 9.2.5
+  , GHC == 9.4.4
+  , GHC == 9.6.1
 
+source-repository head
+  type:     git
+  location: https://github.com/noinia/hspec-with-tempfile
 
 common setup
-    ghc-options: -Wall -O
+    ghc-options: -Wall
     default-language: GHC2021
     build-depends:
         base                    >= 4.16.1.0      &&  < 5

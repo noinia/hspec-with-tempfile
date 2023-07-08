@@ -205,7 +205,8 @@ runGoldenTest (GoldenTest golden a) =
        then do when (golden.actualFilePolicy /= KeepAlways) $ cleanup actualFileFP
                pure $ Result "golden test succeeded"  Success
        else do when (golden.actualFilePolicy /= Discard) $ cleanup actualFileFP
-               let mLoc   = Nothing -- location?
+               actualFileFP' <- decodeFS actualFileFP
+               let mLoc   = Just $ Location actualFileFP' 0 0
                    reason = mkReason golden a $ Diff expectedOut actualOut
                pure $ Result "golden test failed" $ Failure mLoc reason
 
@@ -216,7 +217,7 @@ cleanup = Directory.removeFile
 mkReason               :: Golden actual golden
                        -> actual -> Diff golden -> FailureReason
 mkReason golden a diff = Reason . mconcat $
-    [ "golden test for " <> golden.prettyActual a <> " failed since "
+    [ "golden test with output " <> golden.prettyActual a <> " failed since "
     , golden.prettyGoldenDiff diff
     ]
 
