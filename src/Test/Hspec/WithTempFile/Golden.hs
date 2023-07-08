@@ -1,16 +1,26 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 module Test.Hspec.WithTempFile.Golden
-  ( GoldenTest(..)
-  , Golden(..)
-  , defaultGolden
+  ( Golden(..)
+  , byteStringGolden
+  , textGolden
+  , dimapWith
 
+  , ActualWriter(..)
+  , ActualFile(..)
+  , fromTestName
   , Diff(..)
+
+  , writeActual
+
+  , GoldenTest(..)
   ) where
 
 import           Control.Monad (when)
 import qualified Data.ByteString.Lazy as ByteString
 import qualified Data.ByteString.Lazy.Char8 as Char8
+import           Data.Default.Class
+import           Data.Profunctor
 import qualified Data.Text.Lazy as Text
 import qualified Data.Text.Lazy.Encoding as E
 import           System.Directory.OsPath as Directory
@@ -21,13 +31,168 @@ import           Test.Hspec.Core.Spec
 
 --------------------------------------------------------------------------------
 
+-- | A specification of a golden test.
+data Golden actual golden =
+  Golden { name :: OsString
+         -- ^ description of the test name
+         , actualWriter :: ActualWriter actual golden
+         -- ^ how to write the actual file output onto disk
+         , writeGolden :: OsPath -> golden -> IO ()
+         -- ^ how to read the golden file
+         , goldenFile :: OsPath
+          -- ^ how to write the actual test output to the given file
+         , readGoldenFile :: OsPath -> IO golden
+         -- ^ the filePath that stores the golden output
+         , actualFile :: ActualFile
+         -- ^ file where/how to store the test output
+         , actualFilePolicy :: ActualFilePolicy
+         -- ^ What to do with the actual file
+         , prettyActual     :: actual -> String
+         -- ^ in case the test fails, how to show the actual input
+         , prettyGoldenDiff :: Diff golden -> String
+         -- ^ in case the test fails, how to show the difference between the exected and
+         -- actual outputs.
+         }
+
+instance Show actual => Default (Golden actual ByteString.ByteString) where
+  def = byteStringGolden
+
+----------------------------------------
+-- * Constructing golden tests
+
+-- | The default way of showing the result of golden tests.
+--
+-- The main scheme is to convert your testOutput into a ByteString, and write this
+-- bytestring to a temporary file. The expected test output (stored at goldenFile) is then
+-- read, and the output that is written to the temporary file is compared with the golden
+-- file.  If the output matches the temporary file is deleted. If the test fails, the
+-- output is kept.
+byteStringGolden :: Show testOutput
+                 => Golden testOutput ByteString.ByteString
+byteStringGolden = Golden { name             = [osp|"defaultGolden"|]
+                          , actualWriter     = Convert $ Char8.pack . show
+                          , writeGolden      = File.writeFile
+                          , goldenFile       = [osp|defaultGolden.golden|]
+                          , readGoldenFile   = File.readFile
+                          , actualFile       = tempFile
+                          , actualFilePolicy = KeepOnFailure
+                          , prettyActual     = show
+                          , prettyGoldenDiff = show
+                          }
+
+-- | Same as byteStringGolden, except that to compare the file contents it reads and writes
+-- the data as UTF-8 encoded text.
+textGolden :: Show testOutput => Golden testOutput Text.Text
+textGolden = dimapWith (\fp -> File.writeFile fp . E.encodeUtf8)
+                       show
+                       id
+                       E.decodeUtf8
+                       byteStringGolden
+
+--------------------------------------------------------------------------------
+
+-- | Convenience method to create test specifications from other ones.
+dimapWith                   :: (OsPath -> golden' -> IO ())
+                            -- ^ the new writeGolden implementation
+                            -> (Diff golden' -> String)
+                            -- ^ the new prettyDiff function
+                            -> (actual' -> actual)
+                            -> (golden -> golden')
+                            -> Golden actual golden -> Golden actual' golden'
+dimapWith writeGolden'
+          prettyGoldenDiff'
+          f g t             = Golden { name             = t.name
+                                     , actualWriter     = dimap f g t.actualWriter
+                                     , writeGolden      = writeGolden'
+                                     , goldenFile       = t.goldenFile
+                                     , readGoldenFile   = fmap g . t.readGoldenFile
+                                     , actualFile       = t.actualFile
+                                     , actualFilePolicy = t.actualFilePolicy
+                                     , prettyActual     = t.prettyActual . f
+                                     , prettyGoldenDiff = prettyGoldenDiff'
+                                     }
+
+--------------------------------------------------------------------------------
+-- * Writing your actual test output to a file.
+
+-- | How to write a test to the golden file.
+data ActualWriter actual golden = Convert     (actual -> golden)
+                                -- ^ convert the actual into a value of type golden, so
+                                -- that we can write it to a file using writeGolden
+                                | WriteActual (OsPath -> actual -> IO ())
+                                  -- ^ directly write the actual output to a file.
+                                deriving (Functor)
+
+instance Profunctor ActualWriter where
+  dimap f g = \case
+    Convert h     -> Convert $ g . h . f
+    WriteActual h -> WriteActual $ \fp -> h fp . f
+
+
+--------------------------------------------------------------------------------
+
+-- | Data type describing where to write the file to. Either to a temporary file or a
+-- reglar one with a specific file path.
+data ActualFile = TempFile      { tempDir :: Maybe OsPath
+                                  -- ^ use the system default if Nothing
+                                }
+                | PermanentFile OsPath -- ^ absolute path to a normal file
+                deriving (Show,Eq)
+
+-- | convenience constructor for constructing a temp file in the OS tempdir.
+tempFile :: ActualFile
+tempFile = TempFile Nothing
+
+
+-- | turn the test name into a somewhat reasonable fileName
+fromTestName :: OsString -> OsPath
+fromTestName = makeValid
+
+--------------------------------------------------------------------------------
+
+-- | What to do with the actual test output file.
+data ActualFilePolicy =
+        Discard       -- ^ always discard the actual file, no matter what the test outcome
+      | KeepOnFailure -- ^ only keep the output file on failure
+      | KeepAlways    -- ^ always (i.e. independent of the test output) keep it
+      deriving (Show,Read,Eq)
+
+--------------------------------------------------------------------------------
+
+-- | Specification of the expected output together with the received output.
+data Diff golden = Diff { expected :: golden, actual   :: golden }
+                 deriving (Show,Eq,Functor,Foldable,Traversable)
+
+--------------------------------------------------------------------------------
+-- * Helper functions for the 'Golden' type, typically Extracting information from a
+-- * 'Golden'
+
+-- | Function to write the test output to a file.
+writeActual        :: Golden actual golden -> OsPath -> actual -> IO ()
+writeActual golden = case golden.actualWriter of
+                       Convert f     -> \fp -> golden.writeGolden fp . f
+                       WriteActual g -> g
+
+-- | Get the actual file path, making sure to create the directory if it does not exist.
+actualFilePath        :: Golden actual golden -> IO OsPath
+actualFilePath golden = case golden.actualFile of
+    TempFile mDir      -> do dir   <- maybe Directory.getTemporaryDirectory pure mDir
+                             createTempFile dir $ fromTestName golden.name
+    PermanentFile fp   -> do Directory.createDirectoryIfMissing True fp
+                             pure fp
+
+--------------------------------------------------------------------------------
+
+-- | A Golden test specification together with a particular output
 data GoldenTest actual golden =
-  GoldenTest { theTest    :: Golden actual golden
+  GoldenTest { testSpec    :: Golden actual golden
+             -- ^ the specification of te test
              , testOutput :: actual
+             -- ^ the output of the test
              }
 
 instance Eq golden => Example (GoldenTest actual golden) where
-  evaluateExample gt param act prog = runGoldenTest gt
+  evaluateExample t _param _act _prog = runGoldenTest t
   -- todo, do something with these other args
 
 -- | Run the actual golden test
@@ -56,49 +221,8 @@ mkReason golden a diff = Reason . mconcat $
     , golden.prettyGoldenDiff diff
     ]
 
-data Diff g = Diff { expected :: g
-                   , actual   :: g
-                   }
-            deriving (Show,Eq,Functor,Foldable,Traversable)
-
--- | Function to write the test output to a file.
-writeActual        :: Golden actual golden -> OsPath -> actual -> IO ()
-writeActual golden = case golden.actualWriter of
-                       Convert f     -> \fp -> golden.writeGolden fp . f
-                       WriteActual g -> g
-
-
--- | How to write a test to the golden file.
-data ActualWriter actual golden = Convert     (actual -> golden)
-                                -- ^ convert the actual into a golden and then write it
-                                -- using writeGolden
-                                | WriteActual (OsPath -> actual -> IO ())
-                                  -- ^ directly write the actual output to a file.
-
-
-
-
-data ActualFile = TempFile      { tempDir :: Maybe OsPath
-                                  -- ^ use the system default if Nothing
-                                , nameTemplate :: OsString
-                                  -- ^ file name to use in the tempfile. As with tempfile
-                                  -- if your pattern is "foo.ext" the final filename will
-                                  -- become "fooXYZ.ext", where XYZ is some random string.
-                                }
-                | PermanentFile OsPath -- ^ absolute path to a normal file
-                deriving (Show,Eq)
-
-defaultActualFile      :: OsString -> ActualFile
-defaultActualFile name = TempFile Nothing name
-
-
--- TODO: a proper implementation of this should go in some module somewhere.
-openTempFile           :: OsPath -> OsString -> IO (OsPath, System.IO.Handle)
-openTempFile dir name = do dir'    <- decodeFS dir
-                           name'   <- decodeFS name
-                           (fp',h) <- System.IO.openTempFile dir' name'
-                           fp      <- encodeFS fp'
-                           pure (fp,h)
+--------------------------------------------------------------------------------
+-- * Generic Helper implementations
 
 -- | Creates a temporary file (and closes it).
 createTempFile          :: OsPath -> OsString -> IO OsPath
@@ -106,52 +230,21 @@ createTempFile dir name = do (fp,h) <- openTempFile dir name
                              System.IO.hClose h
                              pure fp
 
--- | Get the actual file path, making sure to create the directlry if it does not exist.
-actualFilePath        :: Golden actual golden -> IO OsPath
-actualFilePath golden = case golden.actualFile of
-    TempFile mDir name -> do dir <- maybe Directory.getTemporaryDirectory pure mDir
-                             createTempFile dir name
-    PermanentFile fp   -> do Directory.createDirectoryIfMissing True fp
-                             pure fp
+-- | Todo, this should go into some library somewhere
+-- moreover, we should implement this properly rather than just decoding the OsPath
+--
+openTempFile           :: OsPath -> OsString -> IO (OsPath, System.IO.Handle)
+openTempFile dir name = do dir'    <- decodeFS dir
+                           name'   <- decodeFS name
+                           (fp',h) <- System.IO.openTempFile dir' name'
+                           fp      <- encodeFS fp'
+                           pure (fp,h)
 
 
--- flip argument order;
-data Golden actual golden =
-  Golden { actualWriter :: ActualWriter actual golden
-         -- ^ how to write the actual file output onto disk
-         , writeGolden :: OsPath -> golden -> IO ()
-         -- ^ how to read the golden file
-         , goldenFile :: OsPath
-          -- ^ how to write the actual test output to the given file
-         , readGoldenFile :: OsPath -> IO golden
-         -- ^ the filePath that stores the golden output
-         , actualFile :: ActualFile
-         -- ^ file where/how to store the test output
-         , actualFilePolicy :: ActualFilePolicy
-         -- ^ What to do with the actual file
-         , prettyActual     :: actual -> String
-         -- ^ in case the test fails, how to show the actual input
-         , prettyGoldenDiff :: Diff golden -> String
-         -- ^ in case the test fails, how to show the difference between the exected and
-         -- actual outputs.
-         }
 
 
 -- readTextFileUtf8 :: OsPath -> IO Text.Text
 -- readTextFileUtf8 =
-
--- | The default way of showing the result of golden tests
-defaultGolden :: Show a => Golden a ByteString.ByteString
-defaultGolden = Golden { actualWriter     = Convert $ Char8.pack . show
-                       , writeGolden      = File.writeFile
-                       , goldenFile       = [osp|defaultGolden.golden|]
-                       , readGoldenFile   = File.readFile
-                       , actualFile       = defaultActualFile [osp|defaultGolden.actual|]
-                       , actualFilePolicy = KeepOnFailure
-                       , prettyActual     = show
-                       , prettyGoldenDiff = show
-                       }
-
 
 -- ipeGoldenWith           :: OsPath -- ^ base file path
 --                      -> String  -- ^ name of the specific test; we append this to the base filepath
@@ -166,20 +259,3 @@ defaultGolden = Golden { actualWriter     = Convert $ Char8.pack . show
 --          , actualFile = Just $ baseFP <.> name <.> "out.actual.ipe"
 --          , failFirstTime = True
 --          }
-
-
-
--- | What to do with the actual test output file
-data ActualFilePolicy = Discard
-                      -- ^ always discard the actual file, no matter what the test outcome
-                      | KeepOnFailure
-                      -- ^ only keep the output file on failure
-                      | KeepAlways
-                      -- ^ always (i.e. independent of the test output) keep it
-                      deriving (Show,Read,Eq)
-
-
-
-
--- goldenWith :: OsPath -- ^ base path
---            ->

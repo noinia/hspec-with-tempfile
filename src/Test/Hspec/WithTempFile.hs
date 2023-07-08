@@ -1,32 +1,42 @@
+{-# LANGUAGE QuasiQuotes #-}
 module Test.Hspec.WithTempFile
-  ( golden
+  ( goldenWith
+  , goldenTest
 
+  , Golden(..)
+  , byteStringGolden
+  , textGolden
+  , dimapWith
 
+  , ActualWriter(..)
+  , ActualFile(..)
 
-  , spec
+  , Diff(..)
+
+  , rawGoldenTest
+  , GoldenTest(..)
   ) where
 
-import Test.Hspec
-import Test.Hspec.WithTempFile.Golden
+import           System.OsPath
+import           Test.Hspec
+import           Test.Hspec.WithTempFile.Golden
 
 --------------------------------------------------------------------------------
 
-fib   :: Int -> Int
-fib n = fibs !! n
-  where
-    fibs = 0 : 1 : zipWith (+) fibs (tail fibs)
+-- | Run a golden golden test, where the golden files are all determined based on the name
+-- of the test, and with respect to the given base dir.
+goldenWith           :: Eq golden
+                     => OsPath                -- ^ base dir containing golden files
+                     -> Golden actual golden  -- ^ the test specification
+                     -> actual                -- ^ the actual output
+                     -> Spec
+goldenWith baseDir t = goldenTest (t { goldenFile = baseDir </> fromTestName t.name })
 
-myTest = GoldenTest defaultGolden (fib 5)
+-- | Runs a golden test exaclty as specified.
+goldenTest     :: Eq golden => Golden actual golden -> actual -> Spec
+goldenTest t x = rawGoldenTest $ GoldenTest t x
 
-spec :: Spec
-spec = describe "example test" $ do
-         golden "simple Text test" defaultGolden (fib 5)
-         goldenTest "simple Text test" $ myTest
-
--- | Combinator to run a golden test with a temporary file
-golden               :: Eq golden => String -> Golden actual golden -> actual -> Spec
-golden name golden a = goldenTest name $ GoldenTest golden a
-
--- | Combinator to run a golden test with a temporary file
-goldenTest         :: Eq golden => String -> GoldenTest actual golden -> Spec
-goldenTest name gt = it name gt
+-- | Combinator to run a golden test as is.
+rawGoldenTest    :: Eq golden => GoldenTest actual golden -> Spec
+rawGoldenTest gt = do nameString <- runIO $ decodeFS gt.testSpec.name
+                      it nameString gt
