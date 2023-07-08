@@ -39,16 +39,16 @@ import           Test.Hspec.WithTempFile.Golden
 -- of the test, and with respect to the given base dir.
 goldenWith           :: Eq golden
                      => OsPath                -- ^ base dir containing golden files
-                     -> Golden actual golden  -- ^ the test specification
+                     -> Golden golden actual  -- ^ the test specification
                      -> actual                -- ^ the actual output
                      -> Spec
 goldenWith baseDir t = goldenTest (t { goldenFile = baseDir </> fromTestName t.name })
 
 -- | Runs a golden test exaclty as specified.
-goldenTest     :: Eq golden => Golden actual golden -> actual -> Spec
+goldenTest     :: Eq golden => Golden golden actual -> actual -> Spec
 goldenTest t x = rawGoldenTest $ GoldenTest t x
 
 -- | Combinator to run a golden test as is.
-rawGoldenTest    :: Eq golden => GoldenTest actual golden -> Spec
+rawGoldenTest    :: Eq golden => GoldenTest golden actual -> Spec
 rawGoldenTest gt = do nameString <- runIO $ decodeFS gt.testSpec.name
                       it nameString gt

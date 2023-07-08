@@ -18,7 +18,7 @@ spec = describe "example test" $ do
 
 -- | I would suggest to define some helper function liek this to incorporate the basedir.
 golden  :: (Show actual, Eq golden)
-        => Golden actual golden -> actual -> Spec
+        => Golden golden actual -> actual -> Spec
 golden = goldenWith [osp|data/golden|]
 
 

@@ -27,6 +27,7 @@ module Test.Hspec.WithTempFile.Golden
 import           Control.Monad (when)
 import qualified Data.ByteString.Lazy as ByteString
 import qualified Data.ByteString.Lazy.Char8 as Char8
+import           Data.Functor.Contravariant
 import           Data.Profunctor
 import qualified Data.Text.Lazy as Text
 import qualified Data.Text.Lazy.Encoding as E
@@ -39,7 +40,7 @@ import           Test.Hspec.Core.Spec
 --------------------------------------------------------------------------------
 
 -- | A specification of a golden test.
-data Golden actual golden =
+data Golden golden actual =
   Golden { name :: OsString
          -- ^ description of the test name
          , actualWriter :: ActualWriter actual golden
@@ -64,6 +65,11 @@ data Golden actual golden =
 -- instance Show actual => Default (Golden actual ByteString.ByteString) where
 --   def = byteStringGolden
 
+contraMap'     :: (actual' -> actual) -> Golden golden actual -> Golden golden actual'
+contraMap' f t = t { actualWriter = lmap f t.actualWriter
+                   , prettyActual = t.prettyActual . f
+                   }
+
 ----------------------------------------
 -- * Constructing golden tests
 
@@ -75,7 +81,7 @@ data Golden actual golden =
 -- file.  If the output matches the temporary file is deleted. If the test fails, the
 -- output is kept.
 byteStringGolden :: Show testOutput
-                 => Golden testOutput ByteString.ByteString
+                 => Golden ByteString.ByteString testOutput
 byteStringGolden = Golden { name             = [osp|"defaultGolden"|]
                           , actualWriter     = Convert $ Char8.pack . show
                           , writeGolden      = File.writeFile
@@ -89,7 +95,7 @@ byteStringGolden = Golden { name             = [osp|"defaultGolden"|]
 
 -- | Same as byteStringGolden, except that to compare the file contents it reads and writes
 -- the data as UTF-8 encoded text.
-textGolden :: Show testOutput => Golden testOutput Text.Text
+textGolden :: Show testOutput => Golden  Text.Text testOutput
 textGolden = dimapWith (\fp -> File.writeFile fp . E.encodeUtf8)
                        show
                        id
@@ -105,7 +111,7 @@ dimapWith                   :: (OsPath -> golden' -> IO ())
                             -- ^ the new prettyDiff function
                             -> (actual' -> actual)
                             -> (golden -> golden')
-                            -> Golden actual golden -> Golden actual' golden'
+                            -> Golden golden actual -> Golden golden' actual'
 dimapWith writeGolden'
           prettyGoldenDiff'
           f g t             = Golden { name             = t.name
@@ -167,21 +173,21 @@ data ActualFilePolicy =
 --------------------------------------------------------------------------------
 
 -- | Specification of the expected output together with the received output.
-data Diff golden = Diff { expected :: golden, actual   :: golden }
-                 deriving (Show,Eq,Functor,Foldable,Traversable)
+data Diff a = Diff { expected :: a, actual :: a }
+            deriving (Show,Eq,Functor,Foldable,Traversable)
 
 --------------------------------------------------------------------------------
 -- * Helper functions for the 'Golden' type, typically Extracting information from a
 -- * 'Golden'
 
 -- | Function to write the test output to a file.
-writeActual        :: Golden actual golden -> OsPath -> actual -> IO ()
+writeActual        :: Golden golden actual -> OsPath -> actual -> IO ()
 writeActual golden = case golden.actualWriter of
                        Convert f     -> \fp -> golden.writeGolden fp . f
                        WriteActual g -> g
 
 -- | Get the actual file path, making sure to create the directory if it does not exist.
-actualFilePath        :: Golden actual golden -> IO OsPath
+actualFilePath        :: Golden golden actual -> IO OsPath
 actualFilePath golden = case golden.actualFile of
     TempFile mDir      -> do dir   <- maybe Directory.getTemporaryDirectory pure mDir
                              createTempFile dir $ fromTestName golden.name
@@ -191,19 +197,19 @@ actualFilePath golden = case golden.actualFile of
 --------------------------------------------------------------------------------
 
 -- | A Golden test specification together with a particular output
-data GoldenTest actual golden =
-  GoldenTest { testSpec    :: Golden actual golden
+data GoldenTest golden actual =
+  GoldenTest { testSpec    :: Golden golden actual
              -- ^ the specification of te test
              , testOutput :: actual
              -- ^ the output of the test
              }
 
-instance Eq golden => Example (GoldenTest actual golden) where
+instance Eq golden => Example (GoldenTest golden actual) where
   evaluateExample t _param _act _prog = runGoldenTest t
   -- todo, do something with these other args
 
 -- | Run the actual golden test
-runGoldenTest                       :: Eq golden => GoldenTest actual golden -> IO Result
+runGoldenTest                       :: Eq golden => GoldenTest golden actual -> IO Result
 runGoldenTest (GoldenTest golden a) =
   do actualFileFP <- actualFilePath golden
      writeActual golden actualFileFP a
@@ -222,7 +228,7 @@ runGoldenTest (GoldenTest golden a) =
 cleanup :: OsPath -> IO ()
 cleanup = Directory.removeFile
 
-mkReason               :: Golden actual golden
+mkReason               :: Golden golden actual
                        -> actual -> Diff golden -> FailureReason
 mkReason golden a diff = Reason . mconcat $
     [ "golden test with output " <> golden.prettyActual a <> " failed since "
