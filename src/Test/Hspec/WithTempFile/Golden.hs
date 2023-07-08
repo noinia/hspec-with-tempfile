@@ -19,7 +19,6 @@ module Test.Hspec.WithTempFile.Golden
 import           Control.Monad (when)
 import qualified Data.ByteString.Lazy as ByteString
 import qualified Data.ByteString.Lazy.Char8 as Char8
-import           Data.Default.Class
 import           Data.Profunctor
 import qualified Data.Text.Lazy as Text
 import qualified Data.Text.Lazy.Encoding as E
@@ -54,8 +53,8 @@ data Golden actual golden =
          -- actual outputs.
          }
 
-instance Show actual => Default (Golden actual ByteString.ByteString) where
-  def = byteStringGolden
+-- instance Show actual => Default (Golden actual ByteString.ByteString) where
+--   def = byteStringGolden
 
 ----------------------------------------
 -- * Constructing golden tests

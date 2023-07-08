@@ -27,7 +27,6 @@ common setup
       , text                    >= 2.0
       , file-io                 >= 0.1
       , bytestring              >= 0.11
-      , data-default-class      ^>= 0.1
 
     default-extensions:
         DataKinds
