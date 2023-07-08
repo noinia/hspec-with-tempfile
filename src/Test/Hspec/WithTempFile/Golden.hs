@@ -39,7 +39,10 @@ import           Test.Hspec.Core.Spec
 
 --------------------------------------------------------------------------------
 
--- | A specification of a golden test.
+-- | A specification of a golden test. In particular, a test where values of type 'actual'
+-- are seriealized into something of type 'golden', and then written to a file. The
+-- content of this file is then compared with the correct answer that is deserialized from
+-- a 'goldenFile'.
 data Golden golden actual =
   Golden { name :: OsString
          -- ^ description of the test name
@@ -62,13 +65,14 @@ data Golden golden actual =
          -- actual outputs.
          }
 
+instance Contravariant (Golden golden) where
+  contramap f t = t { actualWriter = lmap f t.actualWriter
+                    , prettyActual = t.prettyActual . f
+                    }
+
 -- instance Show actual => Default (Golden actual ByteString.ByteString) where
 --   def = byteStringGolden
 
-contraMap'     :: (actual' -> actual) -> Golden golden actual -> Golden golden actual'
-contraMap' f t = t { actualWriter = lmap f t.actualWriter
-                   , prettyActual = t.prettyActual . f
-                   }
 
 ----------------------------------------
 -- * Constructing golden tests
@@ -207,6 +211,7 @@ data GoldenTest golden actual =
 instance Eq golden => Example (GoldenTest golden actual) where
   evaluateExample t _param _act _prog = runGoldenTest t
   -- todo, do something with these other args
+
 
 -- | Run the actual golden test
 runGoldenTest                       :: Eq golden => GoldenTest golden actual -> IO Result

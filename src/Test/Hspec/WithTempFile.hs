@@ -35,7 +35,7 @@ import           Test.Hspec.WithTempFile.Golden
 
 --------------------------------------------------------------------------------
 
--- | Run a golden golden test, where the golden files are all determined based on the name
+-- | Run a golden test, where the golden files are all determined based on the name
 -- of the test, and with respect to the given base dir.
 goldenWith           :: Eq golden
                      => OsPath                -- ^ base dir containing golden files
