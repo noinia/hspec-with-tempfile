@@ -1,5 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
+--------------------------------------------------------------------------------
+-- |
+-- Module      :  Test.Hspec.WithTempFile.Golden
+-- Copyright   :  (C) Frank Staals
+-- License     :  see the LICENSE file
+-- Maintainer  :  Frank Staals
+--------------------------------------------------------------------------------
 module Test.Hspec.WithTempFile.Golden
   ( Golden(..)
   , byteStringGolden

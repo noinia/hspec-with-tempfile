@@ -1,4 +1,14 @@
 {-# LANGUAGE QuasiQuotes #-}
+--------------------------------------------------------------------------------
+-- |
+-- Module      :  Test.Hspec.WithTempFile
+-- Copyright   :  (C) Frank Staals
+-- License     :  see the LICENSE file
+-- Maintainer  :  Frank Staals
+--
+-- Support for easily running golden tests using temporary files
+--
+--------------------------------------------------------------------------------
 module Test.Hspec.WithTempFile
   ( goldenWith
   , goldenTest
