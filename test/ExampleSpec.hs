@@ -15,6 +15,8 @@ spec = describe "example test" $ do
                 (fib 5)
          golden (byteStringGolden { name = [osp|fib_10.golden|] } )
                 (fib 10)
+         golden (byteStringGolden { name = [osp|fib_11.golden|] } )
+                (fib 11)
 
 -- | I would suggest to define some helper function liek this to incorporate the basedir.
 golden  :: (Show actual, Eq golden)

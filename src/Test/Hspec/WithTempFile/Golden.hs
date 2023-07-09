@@ -13,6 +13,7 @@ module Test.Hspec.WithTempFile.Golden
   , textGolden
   , dimapWith
 
+  , GoldenFilePolicy(..)
   , ActualWriter(..)
   , ActualFile(..)
   , fromTestName
@@ -54,6 +55,8 @@ data Golden golden actual =
           -- ^ how to write the actual test output to the given file
          , readGoldenFile :: OsPath -> IO golden
          -- ^ the filePath that stores the golden output
+         , goldenFilePolicy :: GoldenFilePolicy
+         -- ^ what to do with the golden file, in particular if it is missing.
          , actualFile :: ActualFile
          -- ^ file where/how to store the test output
          , actualFilePolicy :: ActualFilePolicy
@@ -91,6 +94,7 @@ byteStringGolden = Golden { name             = [osp|"defaultGolden"|]
                           , writeGolden      = File.writeFile
                           , goldenFile       = [osp|defaultGolden.golden|]
                           , readGoldenFile   = File.readFile
+                          , goldenFilePolicy = CopyWithSuffix -- FailOnMissing
                           , actualFile       = tempFile
                           , actualFilePolicy = KeepOnFailure
                           , prettyActual     = show
@@ -123,6 +127,7 @@ dimapWith writeGolden'
                                      , writeGolden      = writeGolden'
                                      , goldenFile       = t.goldenFile
                                      , readGoldenFile   = fmap g . t.readGoldenFile
+                                     , goldenFilePolicy = t.goldenFilePolicy
                                      , actualFile       = t.actualFile
                                      , actualFilePolicy = t.actualFilePolicy
                                      , prettyActual     = t.prettyActual . f
@@ -166,6 +171,12 @@ fromTestName :: OsString -> OsPath
 fromTestName = makeValid
 
 --------------------------------------------------------------------------------
+
+-- | What to do when the golden file is missing
+data GoldenFilePolicy = FailOnMissing
+                      | CopyWithSuffix -- ^ copies the actual file to 'nameOfTheGoldenFile.actual'
+                      -- | AskInteractively
+                      deriving (Show,Read,Eq)
 
 -- | What to do with the actual test output file.
 data ActualFilePolicy =
@@ -218,16 +229,79 @@ runGoldenTest                       :: Eq golden => GoldenTest golden actual -> 
 runGoldenTest (GoldenTest golden a) =
   do actualFileFP <- actualFilePath golden
      writeActual golden actualFileFP a
-     expectedOut <- golden.readGoldenFile golden.goldenFile
-     actualOut   <- golden.readGoldenFile actualFileFP
-     if expectedOut == actualOut
-       then do when (golden.actualFilePolicy /= KeepAlways) $ cleanup actualFileFP
-               pure $ Result "golden test succeeded"  Success
-       else do when (golden.actualFilePolicy /= Discard) $ cleanup actualFileFP
-               actualFileFP' <- decodeFS actualFileFP
-               let mLoc   = Just $ Location actualFileFP' 0 0
-                   reason = mkReason golden a $ Diff expectedOut actualOut
-               pure $ Result "golden test failed" $ Failure mLoc reason
+
+     goldenExists <- Directory.doesFileExist golden.goldenFile
+     res <- if goldenExists then pure Success
+                            else handleGoldenMissing actualFileFP golden
+     case res of
+       Success -> testGoldenEquality actualFileFP -- we've fixed things, so test for equaltiy
+       _       -> pure $ Result "golden file missing" res -- the file remains missing, so presumably fail
+
+
+  where
+    testGoldenEquality actualFileFP =
+      do
+        expectedOut <- golden.readGoldenFile golden.goldenFile
+        actualOut   <- golden.readGoldenFile actualFileFP
+        if expectedOut == actualOut
+          then do when (golden.actualFilePolicy /= KeepAlways) $ cleanup actualFileFP
+                  pure $ Result "golden test succeeded"  Success
+          else do when (golden.actualFilePolicy /= Discard) $ cleanup actualFileFP
+                  loc <- actualFileLoc actualFileFP
+                  let mLoc   = Just loc
+                      reason = mkReason golden a $ Diff expectedOut actualOut
+                  pure $ Result "golden test failed" $ Failure mLoc reason
+
+-- | Turn the path to the actual file into a 'Location'.
+actualFileLoc              :: OsPath -> IO Location
+actualFileLoc actualFileFP = (\actualFileFP' -> Location actualFileFP' 0 0)
+                            <$> decodeFS actualFileFP
+
+handleGoldenMissing                 :: OsPath
+                                    -- ^ file path to the actual file
+                                    -> Golden golden actual
+                                    -- ^ file path to the golden file
+                                    -> IO ResultStatus
+                                    -- ^ return whether we should contine or that things
+                                    -- are already broken.
+handleGoldenMissing actualFP golden = case golden.goldenFilePolicy of
+  FailOnMissing  -> failWithLocation actualFP golden.goldenFile
+  CopyWithSuffix -> copyWithSuffix actualFP golden.goldenFile
+  -- AskInteractively -> interactivelyCopy actualFP golden.goldenFile
+
+
+copyWithSuffix                   :: OsPath -> OsPath -> IO ResultStatus
+copyWithSuffix actualFP goldenFP = do Directory.copyFile actualFP (goldenFP <.> [osp|actual|])
+                                      failWithLocation actualFP goldenFP
+
+failWithLocation                   :: OsPath -> OsPath -> IO ResultStatus
+failWithLocation actualFP goldenFP =
+  (flip failMissingGoldenFile goldenFP) <$> actualFileLoc actualFP
+
+-- | Failure message for when the golden file is missing
+failMissingGoldenFile        :: Location -> OsPath -> ResultStatus
+failMissingGoldenFile loc fp = Failure (Just loc) $ Reason ("missing golden file " <> show fp)
+
+
+-- | keep asking whether to accept the current result until we anser y or n
+_interactivelyCopy                   :: OsPath -> OsPath -> IO ResultStatus
+_interactivelyCopy actualFP goldenFP = ask
+  where
+    ask = do
+            putStrLn message
+            getLine >>= \case
+              "y" -> installGoldenFile
+              "n" -> failWithLocation actualFP goldenFP
+              _   -> ask
+
+    message = unlines [ "Golden file " <> show goldenFP <> " missing!"
+                      , "Install the actual output file " <> show actualFP <> " as golden file?"
+                      , "y/n"
+                      ]
+
+    installGoldenFile = do Directory.copyFile actualFP goldenFP
+                           pure Success
+
 
 -- | clean up the golden file
 cleanup :: OsPath -> IO ()

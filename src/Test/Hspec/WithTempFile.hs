@@ -18,6 +18,7 @@ module Test.Hspec.WithTempFile
   , textGolden
   , dimapWith
 
+  , GoldenFilePolicy(..)
   , ActualWriter(..)
   , ActualFile(..)
   , fromTestName
