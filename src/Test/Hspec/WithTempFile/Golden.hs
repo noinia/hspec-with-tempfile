@@ -271,8 +271,10 @@ handleGoldenMissing actualFP golden = case golden.goldenFilePolicy of
 
 
 copyWithSuffix                   :: OsPath -> OsPath -> IO ResultStatus
-copyWithSuffix actualFP goldenFP = do Directory.copyFile actualFP (goldenFP <.> [osp|actual|])
-                                      failWithLocation actualFP goldenFP
+copyWithSuffix actualFP goldenFP =
+    do Directory.createDirectoryIfMissing True (takeDirectory goldenFP)
+       Directory.copyFile actualFP (goldenFP <.> [osp|actual|])
+       failWithLocation actualFP goldenFP
 
 failWithLocation                   :: OsPath -> OsPath -> IO ResultStatus
 failWithLocation actualFP goldenFP =
@@ -299,7 +301,8 @@ _interactivelyCopy actualFP goldenFP = ask
                       , "y/n"
                       ]
 
-    installGoldenFile = do Directory.copyFile actualFP goldenFP
+    installGoldenFile = do Directory.createDirectoryIfMissing True (takeDirectory goldenFP)
+                           Directory.copyFile actualFP goldenFP
                            pure Success
 
 
