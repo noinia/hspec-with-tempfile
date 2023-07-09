@@ -11,11 +11,11 @@ import Test.Hspec.WithTempFile
 
 spec :: Spec
 spec = describe "example test" $ do
-         golden (byteStringGolden { name = [osp|fib_5.golden|] } )
+         golden (byteStringGolden { name = [osp|fib_5|] } )
                 (fib 5)
-         golden (byteStringGolden { name = [osp|fib_10.golden|] } )
+         golden (byteStringGolden { name = [osp|fib_10|] } )
                 (fib 10)
-         golden (byteStringGolden { name = [osp|fib_11.golden|] } )
+         golden (byteStringGolden { name = [osp|fib_11|] } )
                 (fib 11)
 
 -- | I would suggest to define some helper function liek this to incorporate the basedir.

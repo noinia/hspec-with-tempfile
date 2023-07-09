@@ -43,7 +43,12 @@ goldenWith           :: Eq golden
                      -> Golden golden actual  -- ^ the test specification
                      -> actual                -- ^ the actual output
                      -> Spec
-goldenWith baseDir t = goldenTest (t { goldenFile = baseDir </> fromTestName t.name })
+goldenWith baseDir t = goldenTest (t { goldenFile = baseDir
+                                                    </> fromTestName t.name
+                                                    <.> takeExtension t.goldenFile
+                                     }
+
+                                  )
 
 -- | Runs a golden test exaclty as specified.
 goldenTest     :: Eq golden => Golden golden actual -> actual -> Spec
