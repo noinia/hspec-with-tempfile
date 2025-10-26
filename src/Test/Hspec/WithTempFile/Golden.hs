@@ -61,9 +61,9 @@ data Golden golden actual =
          -- ^ file where/how to store the test output
          , actualFilePolicy :: ActualFilePolicy
          -- ^ What to do with the actual file
-         , prettyActual     :: actual -> String
+         , prettyActual :: actual -> String
          -- ^ in case the test fails, how to show the actual input
-         , prettyGoldenDiff :: Diff golden -> String
+         , prettyGolden :: golden -> String
          -- ^ in case the test fails, how to show the difference between the exected and
          -- actual outputs.
          }
@@ -98,7 +98,7 @@ byteStringGolden = Golden { name             = [osp|"defaultGolden"|]
                           , actualFile       = tempFile
                           , actualFilePolicy = KeepOnFailure
                           , prettyActual     = show
-                          , prettyGoldenDiff = show
+                          , prettyGolden     = Char8.unpack
                           }
 
 -- | Same as byteStringGolden, except that to compare the file contents it reads and writes
@@ -115,13 +115,13 @@ textGolden = dimapWith (\fp -> File.writeFile fp . E.encodeUtf8)
 -- | Convenience method to create test specifications from other ones.
 dimapWith                   :: (OsPath -> golden' -> IO ())
                             -- ^ the new writeGolden implementation
-                            -> (Diff golden' -> String)
+                            -> (golden' -> String)
                             -- ^ the new prettyDiff function
                             -> (actual' -> actual)
                             -> (golden -> golden')
                             -> Golden golden actual -> Golden golden' actual'
 dimapWith writeGolden'
-          prettyGoldenDiff'
+          prettyGolden'
           f g t             = Golden { name             = t.name
                                      , actualWriter     = dimap f g t.actualWriter
                                      , writeGolden      = writeGolden'
@@ -131,7 +131,7 @@ dimapWith writeGolden'
                                      , actualFile       = t.actualFile
                                      , actualFilePolicy = t.actualFilePolicy
                                      , prettyActual     = t.prettyActual . f
-                                     , prettyGoldenDiff = prettyGoldenDiff'
+                                     , prettyGolden     = prettyGolden'
                                      }
 
 --------------------------------------------------------------------------------
@@ -312,10 +312,9 @@ cleanup = Directory.removeFile
 
 mkReason               :: Golden golden actual
                        -> actual -> Diff golden -> FailureReason
-mkReason golden a diff = Reason . mconcat $
-    [ "golden test with output " <> golden.prettyActual a <> " failed since "
-    , golden.prettyGoldenDiff diff
-    ]
+mkReason golden _ diff = ExpectedButGot Nothing
+                                        (golden.prettyGolden diff.expected)
+                                        (golden.prettyGolden diff.actual)
 
 --------------------------------------------------------------------------------
 -- * Generic Helper implementations

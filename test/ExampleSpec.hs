@@ -3,9 +3,11 @@ module ExampleSpec
   (spec
   ) where
 
-import System.OsPath
-import Test.Hspec
-import Test.Hspec.WithTempFile
+import           System.OsPath
+import           Test.Hspec
+import           Test.Hspec.WithTempFile
+import qualified System.File.OsPath as File
+import qualified Data.ByteString.Lazy.Char8 as Char8
 
 --------------------------------------------------------------------------------
 
@@ -18,7 +20,21 @@ spec = describe "example test" $ do
          golden (byteStringGolden { name = [osp|fib_11|] } )
                 (fib 11)
 
--- | I would suggest to define some helper function liek this to incorporate the basedir.
+         str <- runIO $ File.readFile [osp|data/golden/same.ipe|]
+         golden (byteStringGolden { name         = [osp|same.ipe|]
+                                  , actualWriter = WriteActual $ File.writeFile
+                                  } )
+                str
+
+         {-
+         str' <- runIO $ File.readFile [osp|data/golden/manual.ipe|]
+         golden (byteStringGolden { name = [osp|manual.ipe|]
+                                  , actualWriter = WriteActual $ File.writeFile
+                                  } )
+                str'
+          -}
+
+-- | I would suggest to define some helper function like this to incorporate the basedir.
 golden  :: (Show actual, Eq golden)
         => Golden golden actual -> actual -> Spec
 golden = goldenWith [osp|data/golden|]
