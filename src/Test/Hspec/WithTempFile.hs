@@ -28,6 +28,8 @@ module Test.Hspec.WithTempFile
 
   , rawGoldenTest
   , GoldenTest(..)
+
+  , AllowFail(..)
   ) where
 
 import           System.OsPath
