@@ -23,6 +23,8 @@ module Test.Hspec.WithTempFile.Golden
   , writeActual
 
   , GoldenTest(..)
+
+  , AllowFail(..)
   ) where
 
 import           Control.Monad (when)
@@ -39,6 +41,12 @@ import           System.OsPath
 import           Test.Hspec.Core.Spec
 
 --------------------------------------------------------------------------------
+
+-- | Specify whether a test is allowed to fail
+data AllowFail = AllowFail
+               | RequireSuccess
+               deriving (Show,Eq)
+
 
 -- | A specification of a golden test. In particular, a test where values of type 'actual'
 -- are seriealized into something of type 'golden', and then written to a file. The
@@ -66,6 +74,8 @@ data Golden golden actual =
          , prettyGolden :: golden -> String
          -- ^ in case the test fails, how to show the difference between the exected and
          -- actual outputs.
+         , allowFail :: AllowFail
+         -- ^ Allow the test to (temporarily?) fail
          }
 
 instance Contravariant (Golden golden) where
@@ -99,6 +109,7 @@ byteStringGolden = Golden { name             = [osp|"defaultGolden"|]
                           , actualFilePolicy = KeepOnFailure
                           , prettyActual     = show
                           , prettyGolden     = Char8.unpack
+                          , allowFail        = RequireSuccess
                           }
 
 -- | Same as byteStringGolden, except that to compare the file contents it reads and writes
@@ -132,6 +143,7 @@ dimapWith writeGolden'
                                      , actualFilePolicy = t.actualFilePolicy
                                      , prettyActual     = t.prettyActual . f
                                      , prettyGolden     = prettyGolden'
+                                     , allowFail        = t.allowFail
                                      }
 
 --------------------------------------------------------------------------------

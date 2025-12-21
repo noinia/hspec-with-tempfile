@@ -7,7 +7,7 @@ import           System.OsPath
 import           Test.Hspec
 import           Test.Hspec.WithTempFile
 import qualified System.File.OsPath as File
-import qualified Data.ByteString.Lazy.Char8 as Char8
+-- import qualified Data.ByteString.Lazy.Char8 as Char8
 
 --------------------------------------------------------------------------------
 
@@ -43,4 +43,4 @@ golden = goldenWith [osp|data/golden|]
 fib   :: Int -> Int
 fib n = fibs !! n
   where
-    fibs = 0 : 1 : zipWith (+) fibs (tail fibs)
+    fibs = 0 : 1 : zipWith (+) fibs (drop 1 fibs)

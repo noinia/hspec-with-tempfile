@@ -54,7 +54,14 @@ goldenWith baseDir t = goldenTest (t { goldenFile = baseDir
 goldenTest     :: Eq golden => Golden golden actual -> actual -> Spec
 goldenTest t x = rawGoldenTest $ GoldenTest t x
 
+
+
 -- | Combinator to run a golden test as is.
-rawGoldenTest    :: Eq golden => GoldenTest golden actual -> Spec
+rawGoldenTest    :: Eq golden
+                 => GoldenTest golden actual -> Spec
 rawGoldenTest gt = do nameString <- runIO $ decodeFS gt.testSpec.name
-                      it nameString gt
+                      runTest nameString gt
+  where
+    runTest = case gt.testSpec.allowFail of
+                AllowFail      -> xit
+                RequireSuccess -> it
