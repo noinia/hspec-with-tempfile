@@ -1,5 +1,11 @@
 # Hspec-with-tempfile
 
+![GitHub Workflow Status](
+https://img.shields.io/github/actions/workflow/status/noinia/hspec-with-tempfile/gettested.yml?branch=master)
+[![Hackage](https://img.shields.io/hackage/v/hspec-with-tempfile.svg?color=success)](https://hackage.haskell.org/package/hspec-with-tempfile)
+[![API docs coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fnoinia.github.io%2Fhspec-with-tempfile%2Fhaddock_badge.json)](https://noinia.github.io/hspec-with-tempfile/haddocks)
+
+
 This package provides a (hopefully) convenient way of running golden
 tests that use temporary files using hspec.
 
