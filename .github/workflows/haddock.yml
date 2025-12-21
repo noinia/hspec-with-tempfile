@@ -2,7 +2,7 @@ name: Haddock
 on:
   push:
     branches:
-      - master
+      - main
 jobs:
   linux:
     name: GH-Pages - Linux - ${{ matrix.compiler }}
