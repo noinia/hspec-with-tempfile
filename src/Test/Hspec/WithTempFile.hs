@@ -17,6 +17,7 @@ module Test.Hspec.WithTempFile
   , byteStringGolden
   , textGolden
   , dimapWith
+  , mapGolden
 
   , GoldenFilePolicy(..)
   , ActualWriter(..)
@@ -64,6 +65,6 @@ rawGoldenTest    :: Eq golden
 rawGoldenTest gt = do nameString <- runIO $ decodeFS gt.testSpec.name
                       runTest nameString gt
   where
-    runTest = case gt.testSpec.allowFail of
-                AllowFail      -> xit
-                RequireSuccess -> it
+    runTest name t = case gt.testSpec.allowFail of
+                       AllowFail      -> xit name pending
+                       RequireSuccess -> it  name t

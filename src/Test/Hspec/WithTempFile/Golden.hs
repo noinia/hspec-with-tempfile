@@ -12,6 +12,7 @@ module Test.Hspec.WithTempFile.Golden
   , byteStringGolden
   , textGolden
   , dimapWith
+  , mapGolden
 
   , GoldenFilePolicy(..)
   , ActualWriter(..)
@@ -145,6 +146,14 @@ dimapWith writeGolden'
                                      , prettyGolden     = prettyGolden'
                                      , allowFail        = t.allowFail
                                      }
+
+-- | Mapping function to transform the golden
+mapGolden          :: (golden -> golden')
+                   -> (golden' -> golden)
+                   -> Golden golden actual -> Golden golden' actual
+mapGolden f g spec = dimapWith (\osPath glden' -> writeGolden  spec osPath (g glden'))
+                               (\glden'        -> prettyGolden spec        (g glden'))
+                               id f spec
 
 --------------------------------------------------------------------------------
 -- * Writing your actual test output to a file.
