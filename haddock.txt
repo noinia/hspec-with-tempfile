@@ -1,0 +1,1 @@
+ 100% ( 17 / 17) in 'Test.Hspec.WithTempFile'
