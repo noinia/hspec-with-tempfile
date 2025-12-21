@@ -50,7 +50,7 @@ data Golden golden actual =
          , actualWriter :: ActualWriter actual golden
          -- ^ how to write the actual file output onto disk
          , writeGolden :: OsPath -> golden -> IO ()
-         -- ^ how to read the golden file
+         -- ^ how to write the golden file
          , goldenFile :: OsPath
           -- ^ how to write the actual test output to the given file
          , readGoldenFile :: OsPath -> IO golden
