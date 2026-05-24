@@ -267,7 +267,7 @@ runGoldenTest (GoldenTest golden a) =
         if expectedOut == actualOut
           then do when (golden.actualFilePolicy /= KeepAlways) $ cleanup actualFileFP
                   pure $ Result "golden test succeeded"  Success
-          else do when (golden.actualFilePolicy /= Discard) $ cleanup actualFileFP
+          else do when (golden.actualFilePolicy == Discard) $ cleanup actualFileFP
                   loc <- actualFileLoc actualFileFP
                   let mLoc   = Just loc
                       reason = mkReason golden a $ Diff expectedOut actualOut
